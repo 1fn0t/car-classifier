@@ -65,6 +65,10 @@ def f1_score(y_true, y_pred):
 
 
 if __name__ == '__main__':
+
+    physical_devices = tf.config.list_physical_devices("GPU")
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
     (cars_train, cars_test), cars_info = tfds.load(
         "cars196",
         split=["train", "test"],
@@ -124,7 +128,7 @@ if __name__ == '__main__':
 
     model.compile(optimizer='adam',
                   loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                  metrics=['sparse_categorical_accuracy', f1_score])
+                  metrics=['accuracy', f1_score])
 
     epochs = 100
     model.fit(cars_train, epochs=epochs, validation_data=cars_test)
