@@ -3,8 +3,9 @@ import os
 import numpy as np # linear algebra
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
 import tensorflow_datasets as tfds
+
+from keras import backend as K
 
 height, width = 150, 150
 
@@ -21,6 +22,47 @@ def augment_img(image, label):
     image = tf.image.random_saturation(image, 0, 2)
     return image, label
 
+def f1_score(y_true, y_pred):
+    y_true = K.cast(y_true, 'float32')
+    y_pred = K.cast(K.round(y_pred), 'float32')
+    tp = K.sum(y_true * y_pred)
+    fp = K.sum((1 - y_true) * y_pred)
+    fn = K.sum(y_true * (1 - y_pred))
+    precision = tp / (tp + fp + K.epsilon())
+    recall = tp / (tp + fn + K.epsilon())
+    f1_score = 2 * precision * recall / (precision + recall + K.epsilon())
+    return f1_score
+
+# class PrecisionRecallF1Score(Metric):
+#     def __init__(self, **kwargs):
+#         super(PrecisionRecallF1Score, self).__init__(**kwargs)
+#         self.precision = self.add_weight(name='precision', initializer='zeros')
+#         self.recall = self.add_weight(name='recall', initializer='zeros')
+#         self.f1_score = self.add_weight(name='f1_score', initializer='zeros')
+#
+#     def update_state(self, y_true, y_pred, sample_weight=None):
+#         y_true = K.cast(y_true, y_pred.dtype)
+#         tp = K.sum(y_true * y_pred)
+#         fp = K.sum((1 - y_true) * y_pred)
+#         fn = K.sum(y_true * (1 - y_pred))
+#
+#         precision = tp / (tp + fp + K.epsilon())
+#         recall = tp / (tp + fn + K.epsilon())
+#         f1_score = 2 * (precision * recall) / (precision + recall + K.epsilon())
+#         self.precision.assign_add(precision)
+#         self.recall.assign_add(recall)
+#         self.f1_score.assign_add(f1_score)
+#
+#     def result(self):
+#         return {'precision': self.precision,
+#                 'recall': self.recall,
+#                 'f1_score': self.f1_score}
+#
+#     def reset_states(self):
+#         self.precision.assign(0)
+#         self.recall.assign(0)
+#         self.f1_score.assign(0)
+
 
 if __name__ == '__main__':
     (cars_train, cars_test), cars_info = tfds.load(
@@ -31,13 +73,9 @@ if __name__ == '__main__':
         with_info=True,
     )
     print(cars_info)
-    # print(tfds.list_builders())
     cars_train = cars_train.map(lambda x, y: (tf.image.resize(x, (height, width)), y))
-    # validation_ds = validation_ds.map(lambda x, y: (tf.image.resize(x, size), y))
     cars_test = cars_test.map(lambda x, y: (tf.image.resize(x, (height, width)), y))
 
-    # cars_train = keras.utils.normalize(cars_train)
-    # cars_test = keras.utils.normalize(cars_test)
 
     # cars_train = cars_train.map(normalize_img, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     cars_train = cars_train.cache().map(augment_img)
@@ -49,69 +87,6 @@ if __name__ == '__main__':
 
     print("Train ", cars_info.splits["train"].num_examples)
     print("Test ", cars_info.splits["test"].num_examples)
-
-    # data_augmentation = keras.Sequential(
-    #     [
-    #         # layers.experimental.preprocessing.Resizing(height=64, width=64),
-    #         layers.experimental.preprocessing.RandomFlip(mode="horizontal"),
-    #         layers.experimental.preprocessing.RandomContrast(factor=0.1),
-    #         layers.experimental.preprocessing.RandomCrop(height=32, width=32),
-    #     ]
-    # )
-
-    # data_augmentation = keras.Sequential(
-    #     [
-    #         tf.image
-    #     ]
-    # )
-
-
-    # model = keras.Sequential(
-    #     [
-    #         keras.Input((150, 150, 3)),
-    #         # data_augmentation,
-    #         layers.experimental.preprocessing.Normalization(),
-    #         layers.Conv2D(32, 9, activation='relu'),
-    #         layers.MaxPooling2D(pool_size=(2, 2)),
-    #         layers.Conv2D(64, 3, activation='relu'),
-    #         layers.MaxPooling2D(pool_size=(2, 2)),
-    #         layers.Conv2D(64, 9, activation='relu'),
-    #         layers.MaxPooling2D(pool_size=(2, 2)),
-    #         layers.Conv2D(128, 9, activation='relu'),
-    #         layers.Flatten(),
-    #         layers.Dropout(rate=0.2),
-    #         layers.Dense(196),
-    #     ]
-    # )
-
-    # model = keras.Sequential(
-    #     [
-    #         keras.Input((150, 150, 3)),
-    #         # data_augmentation,
-    #         layers.experimental.preprocessing.Normalization(),
-    #         layers.Conv2D(32, 3, activation="relu"),
-    #         layers.MaxPooling2D(pool_size=(2, 2)),
-    #         layers.Conv2D(64, 3, activation="relu"),
-    #         layers.MaxPooling2D(pool_size=(2, 2)),
-    #         layers.Conv2D(64, 9, activation="relu"),
-    #         layers.MaxPooling2D(pool_size=(2, 2)),
-    #         layers.Conv2D(128, 9, activation="relu"),
-    #         layers.Flatten(),
-    #         layers.Dropout(rate=0.2),
-    #         layers.Dense(196, activation="softmax"),
-    #     ]
-    # )
-    #
-    # print(model.summary())
-    #
-    # model.compile(
-    #     optimizer=keras.optimizers.Adam(lr=0.001),
-    #     loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-    #     metrics=["accuracy"],
-    # )
-    #
-    # model.fit(cars_train, epochs=5, verbose=2)
-    # model.evaluate(cars_test)
 
     base_model = tf.keras.applications.Xception(
         weights="imagenet",  # Load weights pre-trained on ImageNet.
@@ -149,7 +124,7 @@ if __name__ == '__main__':
 
     model.compile(optimizer='adam',
                   loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                  metrics=['sparse_categorical_accuracy'])
+                  metrics=['sparse_categorical_accuracy', f1_score])
 
     epochs = 100
     model.fit(cars_train, epochs=epochs, validation_data=cars_test)
