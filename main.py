@@ -128,7 +128,7 @@ if __name__ == '__main__':
 
     model.compile(optimizer='adam',
                   loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                  metrics=['accuracy', f1_score])
+                  metrics=['accuracy'])
 
     epochs = 100
     model.fit(cars_train, epochs=epochs, validation_data=cars_test)
